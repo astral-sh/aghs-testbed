@@ -1,0 +1,55 @@
+name: Dispatch demo
+run-name: "Dispatch demo: PR #${{ inputs.pull_request }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Verified pull request number
+        required: true
+        type: string
+      head_sha:
+        description: Verified pull request head SHA
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  reply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    env:
+      PR_NUMBER: ${{ inputs.pull_request }}
+      PR_HEAD_SHA: ${{ inputs.head_sha }}
+    steps:
+      - name: Reply to the pull request
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            assert.equal(context.ref, 'refs/heads/main');
+            const pullRequest = Number(process.env.PR_NUMBER);
+            assert(Number.isSafeInteger(pullRequest) && pullRequest > 0);
+            assert.match(process.env.PR_HEAD_SHA, /^[0-9a-f]{40}$/);
+
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            const runUrl = `${process.env.GITHUB_SERVER_URL}/${repository}/actions/runs/${context.runId}`;
+            const body = [
+              '### Dispatch demo succeeded',
+              '',
+              `- PR head verified by dispatch: \`${process.env.PR_HEAD_SHA}\``,
+              `- Workflow ref: \`${context.ref}\``,
+              `- Workflow commit: \`${context.sha}\``,
+              `- Dispatched by: \`${context.actor}\``,
+              `- [Workflow run](${runUrl})`,
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: pullRequest,
+              body,
+            });
+            await core.summary.addRaw(body).write();

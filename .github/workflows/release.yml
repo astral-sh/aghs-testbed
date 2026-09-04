@@ -1,0 +1,62 @@
+name: Environment gate demo
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  setup-check:
+    name: Check environment protection
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GATE_APP_SLUG: ${{ vars.GATE_APP_SLUG }}
+    steps:
+      - name: Verify the reviewer and App protections
+        run: |
+          if [[ -z "$GATE_APP_SLUG" ]]; then
+            echo "::error::Set the GATE_APP_SLUG repository variable to the environment-gate GitHub App's slug."
+            exit 1
+          fi
+
+          if ! gh api "repos/${GITHUB_REPOSITORY}/environments/release-gate" |
+            jq -e 'any(.protection_rules[]?; .type == "required_reviewers" and ((.reviewers // []) | length > 0))' > /dev/null; then
+            echo "::error::The release-gate environment must have at least one required reviewer."
+            exit 1
+          fi
+
+          if ! gh api "repos/${GITHUB_REPOSITORY}/environments/release/deployment_protection_rules" |
+            jq -e --arg slug "$GATE_APP_SLUG" 'any(.custom_deployment_protection_rules[]?; .enabled == true and .app.slug == $slug)' > /dev/null; then
+            echo "::error::Enable the GATE_APP_SLUG App as a custom deployment protection rule on the release environment."
+            exit 1
+          fi
+
+          echo "Verified the required reviewer on release-gate and the configured App protection on release." >> "$GITHUB_STEP_SUMMARY"
+
+  release-gate:
+    # The service policy checks this exact job name.
+    name: release-gate
+    needs: setup-check
+    runs-on: ubuntu-latest
+    environment: release-gate
+    steps:
+      - name: Complete the human review gate
+        run: |
+          echo "The release-gate job passed its environment protection. The release job will now request App approval." >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: Protected job
+    needs: release-gate
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - name: Confirm the protected job ran
+        run: |
+          echo "The protected release job passed its environment protection and ran successfully. No service was deployed." >> "$GITHUB_STEP_SUMMARY"

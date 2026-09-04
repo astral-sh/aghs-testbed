@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "repositories": {
+    "demo": {
+      "name": "astral-sh/aghs-testbed",
+      "id": 1357148725
+    }
+  },
+  "rules": [
+    {
+      "repository": "demo",
+      "on": {
+        "issue_comment": ["created"]
+      },
+      "conditions": {
+        "/comment/body": "/demo"
+      },
+      "workflow": "dispatch-demo.yml"
+    }
+  ]
+}

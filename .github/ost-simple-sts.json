@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "repositories": {
+    "demo": {
+      "name": "astral-sh/aghs-testbed",
+      "id": 1357148725,
+      "oidc_subject": "immutable",
+      "owner_id": 115962839
+    }
+  },
+  "rules": [
+    {
+      "caller": "demo",
+      "caller_workflow": "sts-demo.yml",
+      "caller_ref": "refs/heads/main",
+      "on": ["workflow_dispatch"],
+      "permissions": { "contents": "read" },
+      "target": "demo"
+    }
+  ]
+}

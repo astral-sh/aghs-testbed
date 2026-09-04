@@ -1,0 +1,57 @@
+name: STS demo
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  exchange:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      id-token: write
+    steps:
+      - name: Exchange OIDC for a repository-scoped token
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          STS_EXCHANGE_URL: ${{ vars.STS_EXCHANGE_URL }}
+          STS_AUDIENCE: ${{ vars.STS_AUDIENCE }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            for (const key of ['STS_EXCHANGE_URL', 'STS_AUDIENCE']) {
+              assert(process.env[key], `Set the ${key} repository variable first`);
+              assert.equal(new URL(process.env[key]).protocol, 'https:');
+            }
+
+            const oidc = await core.getIDToken(process.env.STS_AUDIENCE);
+            const response = await fetch(process.env.STS_EXCHANGE_URL, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${oidc}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ repository, permissions: { contents: 'read' } }),
+            });
+            assert.equal(response.status, 200, `STS exchange failed: HTTP ${response.status}`);
+            const issued = await response.json();
+            core.setSecret(issued.token);
+            const app = getOctokit(issued.token);
+
+            try {
+              assert.equal(issued.repository, repository);
+              assert.equal(issued.ref, 'refs/heads/main');
+              const { data } = await app.rest.apps.listReposAccessibleToInstallation();
+              assert.equal(data.total_count, 1);
+              assert.equal(data.repositories[0].full_name, repository);
+              assert.equal(String(data.repositories[0].id), process.env.GITHUB_REPOSITORY_ID);
+              await core.summary
+                .addHeading('STS exchange succeeded')
+                .addRaw(`The App token is scoped to ${repository} with contents: read.\n`)
+                .addRaw(`Expires at ${issued.expires_at}. It is revoked at the end of this step.\n`)
+                .write();
+            } finally {
+              await app.rest.apps.revokeInstallationAccessToken();
+            }
