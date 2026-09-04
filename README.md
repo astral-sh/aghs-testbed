@@ -1,4 +1,4 @@
-# AGHS testbed
+# astral-sh/github-services testbed
 
 Small workflows for exercising deployed STS, environment-gate, and actions-dispatch
 instances from [github-services](https://github.com/astral-sh/github-services).
