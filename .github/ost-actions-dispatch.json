@@ -10,10 +10,7 @@
     {
       "repository": "demo",
       "on": {
-        "issue_comment": ["created"]
-      },
-      "conditions": {
-        "/comment/body": "/demo"
+        "pull_request": ["opened"]
       },
       "workflow": "dispatch-demo.yml"
     }

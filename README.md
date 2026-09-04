@@ -8,7 +8,7 @@ These demos call the services; they do not build or deploy them.
 | --- | --- | --- |
 | [STS](.github/workflows/sts-demo.yml) | Run manually on `main` | A GitHub OIDC token can be exchanged for an App token scoped to this repository. The token is revoked after use. |
 | [Environment gate](.github/workflows/release.yml) | Run manually on `main` | Human approval of `release-gate` allows the service to approve the subsequent `release` deployment in the same run. |
-| [Dispatch](.github/workflows/dispatch-demo.yml) | Comment `/demo` on a same-repository PR | A signed comment webhook dispatches a workflow from trusted `main`, which replies on the PR with the verified head SHA and run link. |
+| [Dispatch](.github/workflows/dispatch-demo.yml) | Open a same-repository PR | A signed pull request webhook dispatches a workflow from trusted `main`, which replies on the PR with the verified head SHA and run link. |
 
 ## Connect the services
 
@@ -25,7 +25,7 @@ repository does not automatically activate them.
 | --- | --- | --- |
 | STS | [`.github/ost-simple-sts.json`](.github/ost-simple-sts.json) | Contents read on this repository and its policy repository |
 | Environment gate | [`.github/environment-gate.json`](.github/environment-gate.json) (inline policy example) | Actions read and Deployments write on this repository |
-| Dispatch | [`.github/ost-actions-dispatch.json`](.github/ost-actions-dispatch.json) | Actions write, Contents read, Pull requests read, and Issues read; subscribe to Issue comments events |
+| Dispatch | [`.github/ost-actions-dispatch.json`](.github/ost-actions-dispatch.json) | Actions write, Contents read, and Pull requests read; subscribe to Pull request events |
 
 For STS and dispatch, set `PolicyRepository=astral-sh/aghs-testbed`,
 `PolicyRepositoryId=1357148725`, `PolicyRef=main`, and `PolicyPath` to the
@@ -112,26 +112,24 @@ the service ran, which is why the setup check is required.
 ## Dispatch
 
 The receiver workflow has only a `workflow_dispatch` trigger. The dispatcher
-handles the `issue_comment` webhook and calls that workflow on `main`; the receiver
-does not check out or execute PR code. Its `GITHUB_TOKEN` has `pull-requests: write`
-so it can post the result on the PR.
+handles the `pull_request` webhook's `opened` action and calls that workflow on
+`main`; the receiver does not check out or execute PR code. Its `GITHUB_TOKEN` has
+`pull-requests: write` so it can post the result on the PR.
 
 1. Open a non-draft PR from a branch **in this repository**. A small change is enough.
-2. As a repository owner, organization member, or collaborator, post a new PR
-   conversation comment containing exactly `/demo`.
-3. Expect a **Dispatch demo** run, followed by a reply from `github-actions[bot]`
+2. Expect a **Dispatch demo** run, followed by a reply from `github-actions[bot]`
    containing the verified PR head SHA, workflow ref and commit, dispatcher actor,
    and run link. The workflow ref should be `refs/heads/main`.
 
-Post a new `/demo` comment to repeat the demonstration. Editing an existing comment
-does not trigger it. The dispatcher fetches the live PR when processing the comment,
-so the reported head SHA is the one it verified then. The workflow can run even if
-the PR targets a branch other than `main`; the workflow itself always comes from `main`.
+Open a new PR to repeat the demonstration. Comments, pushes to an existing PR,
+and reopening a PR do not trigger it. Allow up to five minutes after a policy
+change for the cache to refresh before opening the PR. The dispatcher fetches the
+live PR and checks that its head SHA still matches the opening event. The workflow
+can run even if the PR targets a branch other than `main`; the workflow itself
+always comes from `main`.
 
-Unrelated comments, bot comments, unauthorized commenters, ordinary issues,
-draft/closed PRs, and fork PRs should not produce a run. The bot reply also does not
-match `/demo`, so it cannot trigger a reply loop. Running the receiver manually
-does not validate webhook handling.
+Ordinary issues, draft/closed PRs, and fork PRs should not produce a run.
+Running the receiver manually does not validate webhook handling.
 
 For rejection evidence, correlate the GitHub App webhook delivery ID with the
 webhook or worker logs. A webhook HTTP 202 acknowledges receipt; the linked
