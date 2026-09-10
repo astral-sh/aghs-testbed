@@ -10,7 +10,7 @@
     {
       "repository": "demo",
       "on": {
-        "pull_request": ["opened"]
+        "pull_request": ["opened", "reopened"]
       },
       "workflow": "dispatch-demo.yml"
     }
