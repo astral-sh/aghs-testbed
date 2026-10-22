@@ -27,7 +27,10 @@ jobs:
 
             const request = (method, path, token, body) => fetch(`${base.origin}${path}`, {
               method,
-              headers: token ? {authorization: `Bearer ${token}`} : {},
+              headers: {
+                ...(token ? {authorization: `Bearer ${token}`} : {}),
+                ...(path === '/exchange' ? {'content-type': 'application/json'} : {}),
+              },
               body,
               redirect: 'error',
               signal: AbortSignal.timeout(15000),
@@ -38,15 +41,22 @@ jobs:
 
             const oidc = await core.getIDToken(base.origin);
             core.setSecret(oidc);
-            const exchange = await request('POST', '/exchange', oidc);
+            const denied = await request('POST', '/exchange', oidc,
+              JSON.stringify({scope: 'repository'}));
+            assert.equal(denied.status, 403, 'Policy must deny repository scope');
+
+            const exchangeBody = JSON.stringify({scope: 'job'});
+            const exchange = await request('POST', '/exchange', oidc, exchangeBody);
             assert.equal(exchange.status, 200, 'OIDC exchange must succeed');
             const issued = await exchange.json();
             assert.equal(typeof issued.access_token, 'string');
             core.setSecret(issued.access_token);
             assert.equal(issued.token_type, 'Bearer');
+            assert.equal(issued.scope, 'job');
+            assert.deepEqual([...issued.permissions].sort(), ['delete', 'read', 'write']);
             assert(issued.expires_at > Date.now() / 1000, 'Session must be unexpired');
 
-            const replay = await request('POST', '/exchange', oidc);
+            const replay = await request('POST', '/exchange', oidc, exchangeBody);
             assert.equal(replay.status, 409, 'An OIDC token must only be exchanged once');
             assert.equal((await replay.json()).code, 'token_replayed');
 
@@ -75,5 +85,5 @@ jobs:
               'Deleted values must no longer be readable');
             await core.summary
               .addHeading('Key-value demo succeeded')
-              .addRaw('OIDC exchange, replay rejection, authenticated binary round-trip, and deletion succeeded.\n')
+              .addRaw('Policy scope denial, job-scoped OIDC exchange, replay rejection, authenticated binary round-trip, and deletion succeeded.\n')
               .write();
