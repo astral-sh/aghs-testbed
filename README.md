@@ -26,7 +26,7 @@ repository does not automatically activate them.
 | Service | Policy file | GitHub App access |
 | --- | --- | --- |
 | STS | [`.github/ost-simple-sts.json`](.github/ost-simple-sts.json) | Contents read on this repository and its policy repository |
-| Key-value | [`.github/aghs-kv.json`](.github/aghs-kv.json) | Contents read on this repository |
+| Key-value | [`.github/key-value-store.json`](.github/key-value-store.json) | Contents read on this repository |
 | Environment gate | [`.github/environment-gate.json`](.github/environment-gate.json) (inline policy example) | Actions read and Deployments write on this repository |
 | Dispatch | [`.github/ost-actions-dispatch.json`](.github/ost-actions-dispatch.json) | Actions write, Contents read, and Pull requests read; subscribe to Pull request events |
 
@@ -86,9 +86,11 @@ The policy uses GitHub's immutable OIDC subject format for newly created reposit
 
 The key-value stack must allow this repository's immutable owner and repository
 IDs and configure a policy reader App with `contents: read` access here. Place
-[`.github/aghs-kv.json`](.github/aghs-kv.json) on `main` and use service version
+[`.github/key-value-store.json`](.github/key-value-store.json) on `main` and use service version
 `2026.10.4` or later. The policy grants only `key-value-demo.yml` manual runs on
 `main` permission to read, write, and delete `job`-scoped values.
+Set the stack's `PolicyPath` to `.github/key-value-store.json`.
+The `.github/aghs-kv.json` copy supports deployments that still use that path.
 Set `KV_URL` to the shared deployment's API URL, then run **Key-value demo**:
 
 ```bash
