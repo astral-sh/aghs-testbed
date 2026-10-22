@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "on": [
+        "workflow_dispatch"
+      ],
+      "caller_workflow": "key-value-demo.yml",
+      "caller_ref": "refs/heads/main",
+      "permissions": {
+        "job": [
+          "read",
+          "write",
+          "delete"
+        ]
+      }
+    }
+  ]
+}

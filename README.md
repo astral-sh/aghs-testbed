@@ -7,14 +7,14 @@ These demos call the services; they do not build or deploy them.
 | Demo | Trigger | What it verifies |
 | --- | --- | --- |
 | [STS](.github/workflows/sts-demo.yml) | Run manually on `main` | A GitHub OIDC token can be exchanged for an App token scoped to this repository. The token is revoked after use. |
-| [Key-value](.github/workflows/key-value-demo.yml) | Run manually | A GitHub OIDC token can be exchanged once for a session that writes, reads, and deletes a temporary binary value. |
+| [Key-value](.github/workflows/key-value-demo.yml) | Run manually on `main` | Repository scope is denied; job scope permits an OIDC session to write, read, and delete a temporary binary value. |
 | [Environment gate](.github/workflows/release.yml) | Run manually on `main` | Human approval of `release-gate` allows the service to approve the subsequent `release` deployment in the same run. |
 | [Dispatch](.github/workflows/dispatch-demo.yml) | Open a same-repository PR | A signed pull request webhook dispatches a workflow from trusted `main`, which replies on the PR with the verified head SHA and run link. |
 
 ## Connect the services
 
-Deploy the service versions you intend to validate. STS, gate, and dispatch also
-need their GitHub Apps installed on this repository. A published Serverless
+Deploy the service versions you intend to validate. Each service needs its
+GitHub App installed on this repository. A published Serverless
 Application Repository version is not a running service. Point the gate and
 dispatch Apps' webhooks at the corresponding
 deployed `WebhookUrl` outputs, with their configured webhook secrets.
@@ -26,6 +26,7 @@ repository does not automatically activate them.
 | Service | Policy file | GitHub App access |
 | --- | --- | --- |
 | STS | [`.github/ost-simple-sts.json`](.github/ost-simple-sts.json) | Contents read on this repository and its policy repository |
+| Key-value | [`.github/aghs-kv.json`](.github/aghs-kv.json) | Contents read on this repository |
 | Environment gate | [`.github/environment-gate.json`](.github/environment-gate.json) (inline policy example) | Actions read and Deployments write on this repository |
 | Dispatch | [`.github/ost-actions-dispatch.json`](.github/ost-actions-dispatch.json) | Actions write, Contents read, and Pull requests read; subscribe to Pull request events |
 
@@ -83,19 +84,23 @@ The policy uses GitHub's immutable OIDC subject format for newly created reposit
 
 ## Key-value
 
-The key-value stack must allow the immutable owner and repository IDs for this
-repository. It uses GitHub Actions OIDC directly and does not need a GitHub App.
+The key-value stack must allow this repository's immutable owner and repository
+IDs and configure a policy reader App with `contents: read` access here. Place
+[`.github/aghs-kv.json`](.github/aghs-kv.json) on `main` and use service version
+`2026.10.4` or later. The policy grants only `key-value-demo.yml` manual runs on
+`main` permission to read, write, and delete `job`-scoped values.
 Set `KV_URL` to the shared deployment's API URL, then run **Key-value demo**:
 
 ```bash
 gh workflow run key-value-demo.yml --repo astral-sh/aghs-testbed --ref main
 ```
 
-The demo creates a unique key for each run attempt, verifies a binary round-trip,
-and attempts to delete the key even if the write or read fails. It also checks that unauthenticated
-reads and repeated exchanges of the same OIDC token are rejected. This exercises
-one repository and workflow context; it does not establish isolation between
-repositories or contexts.
+The demo first checks that policy denies `repository` scope, then exchanges its
+OIDC token for a `job`-scoped session. It creates a unique key for each run attempt,
+verifies a binary round-trip, and attempts to delete the key even if the write or
+read fails. It also checks that unauthenticated reads and repeated exchanges of
+the same OIDC token are rejected. This exercises one repository and job; it does
+not establish isolation between repositories or job executions.
 
 ## Environment gate
 
