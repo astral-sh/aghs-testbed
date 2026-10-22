@@ -41,6 +41,12 @@ jobs:
 
             const oidc = await core.getIDToken(base.origin);
             core.setSecret(oidc);
+            const claims = JSON.parse(Buffer.from(oidc.split('.')[1], 'base64url').toString());
+            const fields = ['repository', 'repository_id', 'repository_owner_id',
+              'event_name', 'ref', 'workflow_ref', 'job_workflow_ref', 'environment',
+              'run_id', 'run_attempt', 'check_run_id'];
+            core.info(`OIDC authorization context: ${JSON.stringify(Object.fromEntries(
+              fields.map(field => [field, claims[field] ?? null])) )}`);
             const denied = await request('POST', '/exchange', oidc,
               JSON.stringify({scope: 'repository'}));
             assert.equal(denied.status, 403, 'Policy must deny repository scope');
