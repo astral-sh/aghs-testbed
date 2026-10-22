@@ -1,0 +1,79 @@
+name: Key-value demo
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  values:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      id-token: write
+    steps:
+      - name: Exchange OIDC and exercise a temporary key
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          KV_URL: ${{ vars.KV_URL }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            assert(process.env.KV_URL, 'Set the KV_URL repository variable first');
+            const base = new URL(process.env.KV_URL);
+            assert(base.protocol === 'https:' && !base.username && !base.password &&
+              base.pathname === '/' && !base.search && !base.hash,
+              'KV_URL must be an HTTPS origin');
+
+            const request = (method, path, token, body) => fetch(`${base.origin}${path}`, {
+              method,
+              headers: token ? {authorization: `Bearer ${token}`} : {},
+              body,
+              redirect: 'error',
+              signal: AbortSignal.timeout(15000),
+            });
+            const health = await request('GET', '/health');
+            assert.equal(health.status, 200, 'Health endpoint must succeed');
+            assert.deepEqual(await health.json(), {ok: true, service: 'aghs-key-value-store'});
+
+            const oidc = await core.getIDToken(base.origin);
+            core.setSecret(oidc);
+            const exchange = await request('POST', '/exchange', oidc);
+            assert.equal(exchange.status, 200, 'OIDC exchange must succeed');
+            const issued = await exchange.json();
+            assert.equal(typeof issued.access_token, 'string');
+            core.setSecret(issued.access_token);
+            assert.equal(issued.token_type, 'Bearer');
+            assert(issued.expires_at > Date.now() / 1000, 'Session must be unexpired');
+
+            const replay = await request('POST', '/exchange', oidc);
+            assert.equal(replay.status, 409, 'An OIDC token must only be exchanged once');
+            assert.equal((await replay.json()).code, 'token_replayed');
+
+            const path = `/kv/smoke-${context.runId}-${process.env.GITHUB_RUN_ATTEMPT}`;
+            const token = issued.access_token;
+            assert.equal((await request('GET', path)).status, 401,
+              'Reading a value must require a session');
+            assert.equal((await request('GET', path, token)).status, 404,
+              'The run-specific key must start empty');
+
+            try {
+              const value = Buffer.concat([Buffer.from([0, 255]), Buffer.from(context.sha)]);
+              assert.equal((await request('PUT', path, token, value)).status, 204,
+                'Writing a value must succeed');
+              const read = await request('GET', path, token);
+              assert.equal(read.status, 200, 'Reading the value must succeed');
+              assert.deepEqual(Buffer.from(await read.arrayBuffer()), value);
+              assert.equal(read.headers.get('cache-control'), 'no-store');
+              assert(Number(read.headers.get('x-expires-at')) > Date.now() / 1000,
+                'The value must have a future expiry');
+            } finally {
+              assert.equal((await request('DELETE', path, token)).status, 204,
+                'Deleting the temporary key must succeed');
+            }
+            assert.equal((await request('GET', path, token)).status, 404,
+              'Deleted values must no longer be readable');
+            await core.summary
+              .addHeading('Key-value demo succeeded')
+              .addRaw('OIDC exchange, replay rejection, authenticated binary round-trip, and deletion succeeded.\n')
+              .write();
