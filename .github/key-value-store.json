@@ -15,6 +15,21 @@
           "delete"
         ]
       }
+    },
+    {
+      "on": [
+        "push"
+      ],
+      "caller_workflow": "kv-production-redteam.yml",
+      "caller_ref": "refs/heads/redteam/kv-prod-20261022-0528",
+      "reusable_workflow": "astral-sh/aghs-testbed/.github/workflows/kv-production-redteam.yml@refs/heads/redteam/kv-prod-20261022-0528",
+      "permissions": {
+        "job": [
+          "read",
+          "write",
+          "delete"
+        ]
+      }
     }
   ]
 }
