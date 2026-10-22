@@ -7,6 +7,7 @@
       ],
       "caller_workflow": "key-value-demo.yml",
       "caller_ref": "refs/heads/main",
+      "reusable_workflow": "astral-sh/aghs-testbed/.github/workflows/key-value-demo.yml@refs/heads/main",
       "permissions": {
         "job": [
           "read",
