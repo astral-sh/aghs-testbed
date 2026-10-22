@@ -90,7 +90,6 @@ IDs and configure a policy reader App with `contents: read` access here. Place
 `2026.10.4` or later. The policy grants only `key-value-demo.yml` manual runs on
 `main` permission to read, write, and delete `job`-scoped values.
 Set the stack's `PolicyPath` to `.github/key-value-store.json`.
-The `.github/aghs-kv.json` copy supports deployments that still use that path.
 Set `KV_URL` to the shared deployment's API URL, then run **Key-value demo**:
 
 ```bash
